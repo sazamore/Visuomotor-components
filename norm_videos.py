@@ -17,6 +17,8 @@ upperPt = []
 lowerPt = []
 frameCenter = []
 refPt = []
+diameter = []
+count = 0
 scaled = False
 
 color_data = {
@@ -76,17 +78,13 @@ def get_center(event,x,y,flags,param):
 
 def get_circ(event,x,y,flags,param):
     """Finds edge of drum for distance estimations"""	
-    global frame,frameCenter
-    diameter = []
+    global frame,frameCenter#,diameter
     click = 0
-    while click < 6:
-        if event == cv2.EVENT_LBUTTONDOWN:
-            #draw circles where user clicks
-            cv2.circle(frame,(x,y),1,(0,0,0),-1)
-            cv2.imshow('Click 6 points on the circle', frame)
-            diameter.append(np.sqrt((frameCenter[0]-x)**2 + (frameCenter[1]-y)**2))
-            click +=1
-    print '6 pts found'			
+    if event == cv2.EVENT_LBUTTONDOWN:
+        #draw circles where user clicks
+        cv2.circle(frame,(x,y),1,(0,0,0),-1)
+        cv2.imshow('Click 6 points on circle', frame)
+        diameter.append(np.sqrt((frameCenter[0]-x)**2 + (frameCenter[1]-y)**2))
     return diameter
 
 def get_color(event,x,y,flags,param):
@@ -131,6 +129,7 @@ def get_reference(event, x,y,flags, param):
 
 def selectROI(camera):
     global sel,upperPt, lowerPt
+    
     def selectFrame(event, x, y, flags, param): 
         """Click and drag to select entire probable search area starting in upper left corner."""
         global drag_start, sel, patch
@@ -141,6 +140,8 @@ def selectROI(camera):
             if sel[2] > sel[0] and sel[3] > sel[1]:
                 patch = frame[sel[1]:sel[3],sel[0]:sel[2]]
                 cv2.imshow("result", patch)
+                color_data["upperPt"] = sel[:1]
+                color_data["lowerPt"] = sel[2:]
             drag_start = None
         elif drag_start:
             #print flags
@@ -156,6 +157,7 @@ def selectROI(camera):
                 print("selection is complete")
                 print(sel)
                 drag_start = None
+
 
     cv2.namedWindow("select ROI", cv2.WINDOW_AUTOSIZE)
     cv2.setMouseCallback("select ROI", selectFrame)
@@ -183,7 +185,7 @@ def selectROI(camera):
             #break # exit
         #if k == ord('r'):
             #continue #skip frame without selecting anything
-        if k == ord('a'):
+        if k == ord('a') or k == ord('x'):
             #print('Sel is {}'.format(sel))
             upperPt,lowerPt = sel[:2],sel[2:]
             color_data["upperPt"] = upperPt
@@ -220,8 +222,8 @@ def resize_frame(event,x,y,flags,param):
 
 if __name__ == '__main__':
     #Navigate to video filepath and search for videos by animal number
-    #os.chdir('/Users/sazamore/BehaviorVids/')
-    ID = ["90_170201_5rpm.mp4"] #str(raw_input('Enter animal ID number: ')) + '*.mp4'
+    os.chdir('/Users/sazamore/BehaviorVids')
+    ID = ["81_170426-clip.mp4"] #str(raw_input('Enter animal ID number: ')) + '*.mp4'
 
     #Iterate through videos with animal number. Create and save settings.
     for filename in ID: # glob.glob(ID):
@@ -267,10 +269,6 @@ if __name__ == '__main__':
         frame.shape
         if upperPt == [] or lowerPt ==[]:	
             k,frame = selectROI(camera)
-            #cv2.imshow('Select region of interest',frame)
-            #cv2.setMouseCallback('Select region of interest', selectROI)
-            #cv2.waitKey(10000)
-            #cv2.destroyWindow('Select region of interest')
 
         frame= frame[sel[1]:sel[3],sel[0]:sel[2],:]
         print(frame.shape)
@@ -285,11 +283,6 @@ if __name__ == '__main__':
             cv2.destroyAllWindows()
         elif k == ord('n'):
             cv2.destroyWindow('Keep color correction? (y/n)')
-            #get diam
-    #		cv2.imshow('Click 6 points on circle',frame)
-    #		cv2.setMouseCallback('Click 6 points on circle', get_circ)
-    #		cv2.waitKey(10000)
-    #		cv2.destroyWindow('Click 6 points on circle')
         
         #get center
         if frameCenter == [] : 
@@ -298,8 +291,20 @@ if __name__ == '__main__':
             cv2.waitKey(5000)
             cv2.destroyWindow('Click on center')
 
+        #get diam
+        while count < 6:
+            cv2.imshow('Click 6 points on circle',frame)
+            cv2.setMouseCallback('Click 6 points on circle', get_circ)
+            cv2.waitKey(4000)
+            print(diameter)
+            count += 1
+        cv2.destroyWindow('Click 6 points on circle')
+        radius = int(np.mean(diameter))
+        cv2.circle(frame,frameCenter,radius,(0,0,0),2)
+        color_data['diameter'] = radius*2
+
         #find reference region
-        if refPt ==[]:	
+        if refPt ==[]:
             #get stimulus motion reference
             cv2.imshow('Click pattern for reference',frame)	
             cv2.setMouseCallback('Click pattern for reference',get_reference)
@@ -316,23 +321,7 @@ if __name__ == '__main__':
         #import pdb; pdb.set_trace()
         picklename = filename[:-3]+'p'
         pickle.dump(color_data, open(picklename,"wb"))
-        print(filename)
-#		with open(csvfilename,'wb') as csvfile:	#append?
-#			#fieldnames = ['upperPt','upperPt','frameCenter_x','frameCenter_y','refPt_x1','refPt_y1','refPt_x2','refPt_y2',color_data.keys()]
-#			#writer = csv.DictWriter(csvfile,fieldnames=fieldnames)			
-#			#writer.writeheader()
-#						
-#			writer = csv.writer(csvfile, delimiter = ',')
-#			writer.writerow((upperPt[0][0],upperPt[0][1],lowerPt[0][0],lowerPt[0][1], frameCenter[0],frameCenter[1],refPt[0][0],refPt[0][1],refPt[1][0],refPt[1][1]))
-#			dicthead = csv.DictWriter(csvfile,color_data.keys())
-#			import pdb; pdb.set_trace()
-#			#dicthead.writerow(color_data.keys())			
-#			for i in color_data.keys():
-#				for j in range(len(color_data[i])):
-#					dicthead.writerow(color_data[i][j])
-#			csvfile.close()
-
-        #reset values:
+        print("Successfully saved to {}".format(picklename))
 
 
 #        time.sleep(5)
